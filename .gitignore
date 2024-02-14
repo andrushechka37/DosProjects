@@ -1,4 +1,5 @@
 *.COM
 *.MAP
 *.OBJ
+*.LST
 .DS_Store
