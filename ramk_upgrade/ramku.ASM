@@ -5,7 +5,10 @@ org 100h
 
 
 Start:
-;181818181818181818
+user_input = 99h
+up_left_corner = (80 * 5 + 20) * 2
+
+
 ;----------------------------------------------------------------------
     mov bx, offset control_str
     call parse_command_line
@@ -13,15 +16,32 @@ Start:
     mov di, 0b800h	; adress of the begin of video memory
 	mov es, di
 
-	mov di, (80 * 5 + 20) * 2	; begin of ramk
+	mov di, up_left_corner	; begin of ramk
+
+
+    cmp ax, 0
+    ja user
+    jmp array
+
+array:
+    call draw_ramka
+    mov si, 80h + 13        ; 13 is magic const counted vruchnuy
+    call print_text
+
+    mov ax, 4c00h
+	int 21h	
+user:
 
     call draw_ramka
+    call print_text
 
     mov ax, 4c00h
 	int 21h	
 
 control_str db 'c9cdbbbab0bac8cdbc'
 			db '03030303b003030303'
+
+text db "hui"
 
 
 ;=====================================================================+
@@ -41,6 +61,7 @@ control_str db 'c9cdbbbab0bac8cdbc'
 ;                                                                     |
 ;                                                                     |
 ; Result: in SI the begin of array                                    |
+;         ax - 1 if user input, 0 if not                              |
 ;---------------------------------------------------------------------+
 
 parse_command_line      proc
@@ -68,9 +89,9 @@ parse_command_line      proc
                         call skip_spaces  
                         call get_number  
                         
-                        mov al, al ;                    number of array
+                        ; mov al, al                   number of array
 ;----------------------------------------------------------------------
-                        cmp al, 99h
+                        cmp al, user_input
                         je parse_command_line_user
 
                         mov ah, 18      ; offset for array
@@ -80,14 +101,18 @@ parse_command_line      proc
                         mov si, ax
 
                         mov bl, cl
+
+                        xor ax, ax ; for flag
+
                         ret
                         
 
         parse_command_line_user:
                         mov bl, cl
+                        sub bl, 2
                         add si, 1
                     
-
+                        mov ax , 1
                         ret
                         endp
 
@@ -204,7 +229,7 @@ make_to_number      proc
                     cmp al, 'a'
 
                     jb get_number_next
-                    sub al, 87d
+                    sub al, 'a' - 10
                     jmp skip_get_number_next
 
         get_number_next:
@@ -270,5 +295,69 @@ draw_ramka      proc
 
                 ret
                 endp
+
+
+;======================================================================
+;                       print_text
+;======================================================================
+;
+;
+; cx = &text
+;
+; destr ax, bx, dh
+;
+;----------------------------------------------------------------------
+
+;   dh - width      
+;   bl - length  
+
+print_text      proc
+
+                push dx
+                mov di, up_left_corner ;
+                add dh, 2
+
+                shr dh, 1    ; width / 2
+
+                mov al, dh   ; 
+                mov ah, 160  ; ax = width/ 2 * 160
+                mul ah       ;
+
+                add di, ax
+                xor bh, bh
+                add di, bx   ; in di center 
+
+                add si, 1    ; text
+
+                nop
+                nop
+
+                mov bx, 80h
+
+                xor cx, cx
+                mov cl, [bx] ; size of cmd
+
+                xor ax, ax
+                mov ax, si
+                sub ax, 80h       ; cx = [80h] - (si - 80h)
+
+                sub cx, ax
+
+                sub di, cx        ; di - cx/2 * 2 - offset for text
+                add cx, 1
+
+                pop dx
+
+
+    print_loop:
+
+                lodsb               ; al = ds:[SI++]
+                call draw_symbol    ; es:[DI++] = AL
+
+                loop print_loop
+                
+                ret
+                endp
+
 
 end	Start

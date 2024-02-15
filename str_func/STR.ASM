@@ -88,7 +88,7 @@ memset_asm  proc
 ;   3 arg - size of searchinr area
 ;
 ; Destr: 
-;   al, cx, es, DI
+;   al, cx, es, DI, DF
 ;
 ;
 ; Ret:
@@ -197,7 +197,7 @@ memcmp_asm      proc
 
                 je eqal_memcpy
                 ja second_bigger
-                jb first_bigger
+                jmp first_bigger
 
     eqal_memcpy:
 
