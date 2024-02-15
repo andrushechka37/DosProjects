@@ -9,6 +9,6 @@
 ### Example:
 
 ![str1](/images/1.png)
-![str1](/images/2.png)
+![str2](/images/2.png)
 
 

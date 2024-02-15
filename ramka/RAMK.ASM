@@ -25,6 +25,10 @@ Start:
 	length_ramka = 10
 
 	symbol_count = 80*2
+
+control_str db '123456789'
+			db 'abcdefght'
+
 ;----------------------------------------------------------------------
 
 
