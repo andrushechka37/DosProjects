@@ -5,31 +5,44 @@ org 100h
 
 
 Start:
+
+;----------------------------------------------------------------------
 user_input = 99h
 up_left_corner = (80 * 5 + 20) * 2
 
+begin_of_command_line = 80h
+begin_0f_video_mem    = 0b800h
+
+size_of_control_str = 9
+
+size_sym_line         = 80
+size_sym_col_default  = 24
 
 ;----------------------------------------------------------------------
     mov bx, offset control_str
     call parse_command_line
 
-    mov di, 0b800h	; adress of the begin of video memory
+    mov di, begin_0f_video_mem	              ; adress of the begin of video memory
 	mov es, di
 
-	mov di, up_left_corner	; begin of ramk
+
+	;mov di, up_left_corner	                  ; begin of ramk
+    call set_left_up_corner
 
 
-    cmp ax, 0
+    cmp ax, 0                                 ; ax is flag user or control string (makes in parse_command_line)
     ja user
     jmp array
 
 array:
     call draw_ramka
-    mov si, 80h + 13        ; 13 is magic const counted vruchnuy
+    mov si, begin_of_command_line + 13        ; 13 is magic const counted vruchnuy
+
     call print_text
 
     mov ax, 4c00h
 	int 21h	
+
 user:
 
     call draw_ramka
@@ -71,7 +84,6 @@ parse_command_line      proc
                         call get_number
 
                         mov dh, al;                               width
-                        sub dh, 2
 ;----------------------------------------------------------------------
                         xor cx, cx      ; ch = 0
 
@@ -94,25 +106,26 @@ parse_command_line      proc
                         cmp al, user_input
                         je parse_command_line_user
 
-                        mov ah, 18      ; offset for array
+                        mov ah, size_of_control_str * 2      ; offset for array
                         mul ah          ;
 
-                        add ax, bx
-                        mov si, ax
+                        add ax, bx      ;
+                        mov si, ax      ; si += x * 18
 
-                        mov bl, cl
+                        mov bl, cl      ; length in bl
 
-                        xor ax, ax ; for flag
+                        xor ax, ax      ; for flag
 
                         ret
                         
 
         parse_command_line_user:
-                        mov bl, cl
-                        sub bl, 2
-                        add si, 1
+
+                        mov bl, cl      ; width in bl
+                        sub bl, 2       ; strange fix----------------------?
+                        add si, 1       ; start of array
                     
-                        mov ax , 1
+                        mov ax , 1      ; for flag
                         ret
                         endp
 
@@ -121,9 +134,11 @@ parse_command_line      proc
 ;                       draw_line
 ;======================================================================
 ;
-;
-;                   lkelgnldf.ghndn
-;
+; Require: di - left_up_corner
+;          si - begin of control array
+;          es - 0b800h
+;                   
+; Destr: si, di
 ;
 ;----------------------------------------------------------------------
 
@@ -138,8 +153,8 @@ draw_line       proc
 
                 push cx
 
-                xor cx, cx
-                mov cl, bl
+                xor cx, cx                  ;   
+                mov cl, bl                  ; mov cx, bl
 
     draw_line_loop:
 
@@ -152,15 +167,18 @@ draw_line       proc
                 call get_number
                 call draw_symbol
 
-                add di, 80 * 2
+                add di, size_sym_line * 2   ; next line
 
                 push bx
-                xor bh, bh
 
-                shl bx, 1h
+                xor bh, bh                  ;
+                                            ;
+                shl bx, 1h                  ;
+                                            ; to begin of str
+                sub di, bx                  ;
+                sub di, 4                   ;
 
-                sub di, bx
-                sub di, 4
+
                 pop bx
 
                 ret
@@ -172,13 +190,14 @@ draw_line       proc
 ; reads from ds:[si] one byte
 ;
 ;
-; Dest: al
+; Dest: al, DF
 ;
 ; Ret: al
 ;----------------------------------------------------------------------
 get_number      proc
 
                 CLD
+
                 push cx
                 xor cx, cx
                 xor al, al
@@ -219,7 +238,7 @@ skip_spaces     proc
 ;======================================================================
 ;                       make_to_number
 ;======================================================================
-; makes al number instead of symbol
+; makes al number instead of symbol (sym to hex)
 ;
 ;
 ; Dest: al
@@ -243,9 +262,9 @@ make_to_number      proc
 ;                       draw_symbol
 ;======================================================================
 ; 
-; colour in dl
+; Require : colour in dl
 ;
-; Dest: si
+; Dest: si,
 ;----------------------------------------------------------------------
 draw_symbol     proc
 
@@ -264,8 +283,11 @@ draw_symbol     proc
 ;                       draw_ramka
 ;======================================================================
 ;
-;
-;
+; Require: di - left_up_corner
+;          si - begin of control array
+;          es - 0b800h
+;                   
+; Destr: si, di
 ;----------------------------------------------------------------------
 draw_ramka      proc
 
@@ -273,24 +295,23 @@ draw_ramka      proc
 
                 push cx
 
-                xor cx, cx
-                mov cl, dh
+                xor cx, cx      ;
+                mov cl, dh      ; cx = count of middle strs
+                sub cl, 2
 
     draw_ramka_loop:
 
                 call draw_line
-                sub si, 6
+                sub si, 6       ; to print again middle symbols
 
                 loop draw_ramka_loop
 
-                add si, 6
+                add si, 6       ; to skip middle symbols
 
                 call draw_line
 
 
                 pop cx
-
-
 
 
                 ret
@@ -301,9 +322,9 @@ draw_ramka      proc
 ;                       print_text
 ;======================================================================
 ;
-;
-; cx = &text
-;
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;           !!!!!!!!!!!!!!!PLACE HOLDER!!!!!!!!!!!!!!!!!!!!
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ; destr ax, bx, dh
 ;
 ;----------------------------------------------------------------------
@@ -314,37 +335,47 @@ draw_ramka      proc
 print_text      proc
 
                 push dx
-                mov di, up_left_corner ;
-                add dh, 2
+                ;mov di, up_left_corner 
+                call set_left_up_corner
 
-                shr dh, 1    ; width / 2
+                shr dh, 1                           ; width / 2
 
-                mov al, dh   ; 
-                mov ah, 160  ; ax = width/ 2 * 160
-                mul ah       ;
+                mov al, dh                          ; 
+                mov ah, size_sym_line * 2           ; ax = width/ 2 * 160
+                mul ah                              ;
 
                 add di, ax
                 xor bh, bh
-                add di, bx   ; in di center 
+;---------------------------------------------------------------------------------------
+                test bx, 1
+                jne print_text_nech     ; costul because smth happens and need to alline
+                add di, 1
+    print_text_nech:            
+;---------------------------------------------------------------------------------------
+                add di, bx                          ; in di center 
 
-                add si, 1    ; text
+                add si, 1                           ; text
 
                 nop
                 nop
 
-                mov bx, 80h
+                mov bx, begin_of_command_line
 
                 xor cx, cx
-                mov cl, [bx] ; size of cmd
+                mov cl, [bx]                        ; size of cmd
 
                 xor ax, ax
                 mov ax, si
-                sub ax, 80h       ; cx = [80h] - (si - 80h)
+                sub ax, begin_of_command_line       ; cx = [80h] - (si - 80h)
 
                 sub cx, ax
 
-                sub di, cx        ; di - cx/2 * 2 - offset for text
+                sub di, cx                          ; di - cx/2 * 2 - offset for text
                 add cx, 1
+
+                mov ax, cx
+
+                call make_di_parity
 
                 pop dx
 
@@ -359,5 +390,73 @@ print_text      proc
                 ret
                 endp
 
+;======================================================================
+;                       set_left_up_corner
+;======================================================================
+;
+;
+; Ret: di - up_left corner
+;
+; Destr: di
+;----------------------------------------------------------------------
+;   dh - width      
+;   bl - length 
+
+set_left_up_corner      proc
+
+                        push ax
+                        push bx
+
+                        xor di, di
+
+                        mov al, size_sym_col_default     ;   
+                        sub al, dh                       ; y = (y0 - wigth) / 2 | countity of lines
+                        shr al, 1
+
+                        mov ah, size_sym_line * 2   ; ax = 160 * y
+                        mul ah                      ;
+
+                        add di, ax
+
+                        xor ax, ax                  
+                        xor bh, bh                 
+
+                        mov al, size_sym_line       ;
+                        sub al, bl                  ; di += (default_length - length_ramka) / 2 * 2
+
+                        add di, ax                  ;
+
+                        xor ax, ax
+                        mov al, bl
+                        call make_di_parity
+
+                        pop bx
+                        pop ax
+
+                        ;mov di, up_left_corner
+
+                        ret
+                        endp
+
+;======================================================================
+;                       make_di_parity
+;======================================================================
+;
+;
+; 
+; Destr: di
+;
+;----------------------------------------------------------------------
+make_di_parity      proc
+
+                    test ax, 1
+                    jne nechet
+                    jmp skip_chetn
+
+        nechet:
+                    add di, 1       ; becaue di - cx can be nechetn
+        skip_chetn:
+                    ret
+                    endp
 
 end	Start
