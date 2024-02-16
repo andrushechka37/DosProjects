@@ -1,3 +1,8 @@
+# RAMKA UPGRADE
+
+![str3](/images/3.png)
+
+
 # RAMKA
 ## Draws ramka with given parametres:
 
