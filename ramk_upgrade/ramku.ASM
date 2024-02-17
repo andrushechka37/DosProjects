@@ -8,7 +8,7 @@ Start:
 
 ;----------------------------------------------------------------------
 user_input = 99h
-up_left_corner = (80 * 5 + 20) * 2
+up_left_corner = (80 * 5 + 20) * 2          ;!!!!!!!!!!!  TODO: before start
 
 begin_of_command_line = 80h
 begin_0f_video_mem    = 0b800h
@@ -22,7 +22,7 @@ size_sym_col_default  = 24
     mov bx, offset control_str
     call parse_command_line
 
-    mov di, begin_0f_video_mem	              ; adress of the begin of video memory
+    mov di, begin_0f_video_mem	              ; address of the begin of video memory
 	mov es, di
 
 
@@ -32,9 +32,7 @@ size_sym_col_default  = 24
 
     cmp ax, 0                                 ; ax is flag user or control string (makes in parse_command_line)
     ja user
-    jmp array
 
-array:
     call draw_ramka
     mov si, begin_of_command_line + 13        ; 13 is magic const counted vruchnuy
 
@@ -123,7 +121,7 @@ parse_command_line      proc
 
                         mov bl, cl      ; width in bl
                         sub bl, 2       ; strange fix----------------------?
-                        add si, 1       ; start of array
+                        inc si          ; start of array
                     
                         mov ax , 1      ; for flag
                         ret
@@ -149,7 +147,7 @@ draw_line       proc
 
                 call get_number
 
-
+                ; bollshe probjellchickoff
 
                 push cx
 
@@ -174,7 +172,7 @@ draw_line       proc
                 xor bh, bh                  ;
                                             ;
                 shl bx, 1h                  ;
-                                            ; to begin of str
+                                            ; to begin of str, such kind of shit
                 sub di, bx                  ;
                 sub di, 4                   ;
 
@@ -268,7 +266,7 @@ make_to_number      proc
 ;----------------------------------------------------------------------
 draw_symbol     proc
 
-                push ax
+                push ax                         ; TODO: mov ah, dl stosw
 
                 stosb       ; ds[si++] = al
                 mov al, dl
@@ -348,7 +346,7 @@ print_text      proc
                 xor bh, bh
 ;---------------------------------------------------------------------------------------
                 test bx, 1
-                jne print_text_nech     ; costul because smth happens and need to alline
+                jne print_text_nech     ; costyill because smth shit happens here and need to alline
                 add di, 1
     print_text_nech:            
 ;---------------------------------------------------------------------------------------
@@ -433,7 +431,7 @@ set_left_up_corner      proc
                         pop bx
                         pop ax
 
-                        ;mov di, up_left_corner
+                        ; mov di, up_left_corner
 
                         ret
                         endp

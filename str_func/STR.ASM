@@ -195,11 +195,11 @@ memcmp_asm      proc
 
                 repe cmpsb         ; cmp ds:[SI++] to es:[DI++] | (SI - DI)
 
-                je eqal_memcpy
+                je equal_memcpy
                 ja second_bigger
                 jmp first_bigger
 
-    eqal_memcpy:
+    equal_memcpy:
 
                 mov cx, 0
                 jmp  end_mempy 
