@@ -5,29 +5,27 @@ org 100h
 
 
 Start:
+
 ;-----------------------------consts----------------------------------
 
-	colour = 33d    ; 00010001 - green phon
+	colour = 0ch    ; 00010001 - green phon
 
-	up_left = 201
-	up_right = 187
+	up_left = 0c9h
+	up_right = 0bbh
 	
-	down_left = 200
-	down_right = 188
+	down_left = 0c8h
+	down_right = 0bch
 
-	middle_left = 204
-	middle_right = 185
+	middle_left = 0bah
+	middle_right = 0bah
 
-	up = 203
-	down = 202d
+	up = 0cdh
+	down = 0cdh
 
 	width_ramka = 15
 	length_ramka = 10
 
 	symbol_count = 80*2
-
-control_str db '123456789'
-			db 'abcdefght'
 
 ;----------------------------------------------------------------------
 
