@@ -81,13 +81,13 @@ Start:
 ;; ---------------------------------------------------------------------
 ramka_interrupt         proc
 
-		;push dx cx bx ax
-                push ax bx es
 
+                push ss es ds sp bp di si dx cx bx ax           ; push all regs to stack to print them
+                                                                ; correctly
 
+                mov bp, sp                                      ; save bp, pointed to ax
 
-
-;; ------------------video seg-----------------------------------------
+;; ------------------main seg of interrupt-----------------------------------------
 
 		push begin_of_video_mem
 		pop es
@@ -97,17 +97,20 @@ ramka_interrupt         proc
 		cmp al, start_symbol
 		jne not_start_symbol
 
-	        mov bx, 0	; begin of ramk
+;; ----------------------restore ds value----------------------------------------
 
                 push cs
                 pop ds
 
+;; ------------------------------------------------------------------------------
+
+                mov bx, 0	; begin of ramk
+
                 push dx si di cx
-	        call draw_ramk
+	        call draw_ramk 
                 pop cx di si dx
 
                 call draw_registers
-
 
 ;; ------------------blink 61 port higher bit--------------------------
 	
@@ -126,59 +129,51 @@ ramka_interrupt         proc
 		out 20h, al						; so other interrupts can play
 
 ;; ---------------------------------------------------------------------
-                ;pop ax bx cx dx
-                pop es bx ax
+
+                pop ax bx cx dx si di bp sp ds es ss
                 iret
 
 ;; -------------jump to old adress of interrupt-------------------------
 
 not_start_symbol:
 
-        ;pop ax bx cx dx
-        pop es bx ax
+                pop ax bx cx dx si di bp sp ds es ss            ; restore old regs
 
-	db 0EAh					        ; long jump
-        dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
-        dedault_IRQ1_address_segment  dw 0		;
+	        db 0EAh					        ; long jump
+                dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
+                dedault_IRQ1_address_segment  dw 0		;
 
 ;; ---------------------------------------------------------------------
 
         iret
         endp
 
-
-
-
 ;; -------------------------------------------------------------------RAMKA---------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
 
 
 
 ;-----------------------------consts----------------------------------
 
-	colour = 0ch    ; 00010001 - green phon
+	colour                          = 0ch   
 
-	up_left = 0c9h
-	up_right = 0bbh
+	up_left                         = 0c9h
+	up_right                        = 0bbh
 	
-	down_left = 0c8h
-	down_right = 0bch
+	down_left                       = 0c8h
+	down_right                      = 0bch
 
-	middle_left = 0bah
-	middle_right = 0bah
+	middle_left                     = 0bah
+	middle_right                    = 0bah
 
-	up = 0cdh
-	down = 0cdh
+	up                              = 0cdh
+	down                            = 0cdh
 
-	width_ramka = 10
-	length_ramka = 12
+	width_ramka                     = 10
+	length_ramka                    = 12
 
-	symbol_count = 80*2
+	symbol_count                    = 80*2
+
+        number_of_print_registers       = 12
 
 ;----------------------------------------------------------------------
 
@@ -311,54 +306,161 @@ draw_ramk	proc
 ;; ---------------------------------------------------------------------
 draw_registers        proc
 
-        mov cx, 12
+        mov cx, number_of_print_registers
         mov si, offset text_reg
-        mov di, 160 + 2
-        mov dl, colour
 
+        mov di, 160 + 2                     ; left up corner, but -> 1 and 1 down   
+        mov dl, colour                      ;                                 
+                                            ;
         print_loop:
 
-                lodsb              
-                call draw_symbol_right    
+                  
+                call draw_register_line    ; draws "ax: 0000"
 
-                lodsb                     ; al = ds:[SI++]
-                call draw_symbol_right    ; es:[DI++] = AL
-
-                add di, 160 - 4
+                add di, 160 - 18          ; go to the next line (\n)
 
                 loop print_loop
-
-
 
                 ret
                 endp
 
 ;======================================================================
-;                       draw_symbol_right
+;                       draw_register_line
 ;======================================================================
 ; 
 ; Require : colour in dl
 ;
 ; Dest: si,
 ;----------------------------------------------------------------------
-draw_symbol_right     proc
+draw_register_line     proc
+
 
                 push ax                         ; TODO: mov ah, dl stosw
+                push bx
 
-                stosb                           ; ds[si++] = al
-                mov al, dl                      ; draw name of register
-                stosb                           ;
+                mov al, ' '
+                call draw_symbol_for_registers
 
+                lodsb                           ;
+                call draw_symbol_for_registers  ; first letter        
                 
+                lodsb                           ;
+                call draw_symbol_for_registers  ; sec number      
+
+                mov al, ':'
+                call draw_symbol_for_registers
+
+                mov al, ' '
+                call draw_symbol_for_registers
+;; ---------------------------------------------------------------------
+
+                mov ax, [bp]
+
+                mov bl, al              ; firstly print elder number
+                mov al, ah              ;
+
+                call draw_register_value
 
 
+
+                mov al, bl
+                 call draw_register_value
+
+
+
+
+
+                inc bp                           ; add bp, 2
+                inc bp                           ;
+
+                pop bx
                 pop ax
                 ret
                 endp
 
+;; =====================================================================
+;;                          draw_symbol_for_registers
+;; =====================================================================
+;; another draw symbol because in draw ramka draw_sym is huina
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draws symbol and colour in /ES/ : [/DI/]
+;;
+;; Destr: 
+;; ---------------------------------------------------------------------
+draw_symbol_for_registers       proc
 
+                                stosb
+                                mov al, dl                      
+                                stosb  
+
+                                ret
+                                endp
+
+
+;; =====================================================================
+;;                          draw_register_value
+;; =====================================================================
+;; draws reg value not as symbol but as hex number
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;; Entry: /AL/  --  symbol to draw
+;;
+;;
+;; Side Effects:
+;;
+;; Destr: 
+;; ---------------------------------------------------------------------
+draw_register_value             proc
+
+                                push ax
+                                push bx
+                                push cx
+
+                                xor ah, ah
+
+                                mov al, cl
+
+                                and al, 11110000b       ; so we get elder number of al
+
+                                rol al, 4               ; so we get number 0-15
+
+                                mov bx, offset hex_alphabet
+
+                                add bx, ax              
+
+                                mov al, cs:[bx]         ; print elder number of al
+                                stosb                   ;
+
+                                mov al, dl
+                                stosb
+
+
+                                mov al, cl
+                                and al, 00001111b
+        
+                                mov bx, offset hex_alphabet
+                                add bx, ax   
+
+                                mov al, cs:[bx]         ; print elder number of al
+                                stosb                   ;
+
+                                mov al, dl
+                                stosb
+
+
+                                pop cx
+                                pop bx
+                                pop ax
+
+
+                                ret
+                                endp
 
 text_reg db 'axbxcxdxsidibpspdsessscs'
+
+hex_alphabet db '0123456789abcdef'
 
 EndOfProg:
 
