@@ -130,3 +130,38 @@ IntOverride09	proc
 EndOfProg:
 
 end Start
+
+
+
+
+
+
+
+
+
+
+
+draw_reg        proc
+
+        mov cx, 4
+        mov si, offset text
+        mov di, 160 + 2
+
+        print_loop:
+
+                lodsb               ; al = ds:[SI++]
+                call draw_sym    ; es:[DI++] = AL
+
+                lodsb               ; al = ds:[SI++]
+                call draw_sym    ; es:[DI++] = AL
+
+                lodsb               ; al = ds:[SI++]
+                call draw_sym    ; es:[DI++] = AL
+
+                loop print_loop
+
+                ret
+                endp
+
+
+text db 'raxrbxrcxrdx'

@@ -11,7 +11,8 @@ begin_of_video_mem             =  0b800h
 number_of_irq                  =  01h
 size_of_interupt_func_adress   =  4
 start_symbol		       =  9             ; scan code of '8'
-size_sym_line                  = 80
+size_sym_line                  =  80
+
 ;; ---------------------------------------------------------------------
 
 Start:
@@ -42,8 +43,8 @@ Start:
 
         mov es:[bx], offset ramka_interrupt                                ; addr offset
 
-		push cs                                                    ; to get our segment
-		pop ax                                                     ;
+	push cs                                                            ; to get our segment
+	pop ax                                                             ;
 
         mov es:[bx + 2], ax                                                ; addr segment
 
@@ -72,29 +73,19 @@ Start:
 ;; =====================================================================
 ;;                         ramka_interrupt 
 ;; =====================================================================
-;; Replace stantart 09h interrupt
+;; analog to  stantart 09h interrupt
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;; Expect: -
-;;
-;;
-;; Entry: -
-;;
-;;
-;; Return: -
-;;
-;;
-;; Note: -
-;;
-;;
-;; Call Convention: CDECL
-;;
-;; Side Effects:
+;; Side Effects: draws ramka in up left corner
 ;;
 ;; Destr: -
 ;; ---------------------------------------------------------------------
 ramka_interrupt         proc
 
-		push dx cx bx ax
+		;push dx cx bx ax
+                push ax bx es
+
+
+
 
 ;; ------------------video seg-----------------------------------------
 
@@ -108,7 +99,14 @@ ramka_interrupt         proc
 
 	        mov bx, 0	; begin of ramk
 
+                push cs
+                pop ds
+
+                push dx si di cx
 	        call draw_ramk
+                pop cx di si dx
+
+                call draw_reg
 
 
 ;; ------------------blink 61 port higher bit--------------------------
@@ -128,14 +126,16 @@ ramka_interrupt         proc
 		out 20h, al						; so other interrupts can play
 
 ;; ---------------------------------------------------------------------
-                pop ax bx cx dx
+                ;pop ax bx cx dx
+                pop es bx ax
                 iret
 
 ;; -------------jump to old adress of interrupt-------------------------
 
 not_start_symbol:
 
-        pop ax bx cx dx
+        ;pop ax bx cx dx
+        pop es bx ax
 
 	db 0EAh					        ; long jump
         dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
@@ -150,6 +150,14 @@ not_start_symbol:
 
 
 ;; -------------------------------------------------------------------RAMKA---------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 ;-----------------------------consts----------------------------------
 
@@ -203,11 +211,13 @@ draw_sym	proc
 ;	AH - middle elements
 ;	DH - last elem
 ;
-; Destr:  BP DL
+; Destr:  DL BX AL CX
 ;
 ;----------------------------------------------------------------------
 
 draw_line	proc
+
+                push bp
 
 		mov DL, AL
 		call draw_sym	; draws first symbol
@@ -236,6 +246,8 @@ draw_line	proc
 
 		mov al, dl
 
+                pop bp
+
 		ret
 	
 		endp
@@ -244,7 +256,7 @@ draw_line	proc
 ;
 ; Use constants given in the top of the program
 ;
-;
+; Destr: AX, DX BX CX
 ;----------------------------------------------------------------------
 
 draw_ramk	proc
@@ -310,20 +322,54 @@ draw_ramk	proc
 ;; ---------------------------------------------------------------------
 draw_reg        proc
 
+        mov cx, 4
+        mov si, offset text_reg
+        mov di, 160 + 2
+        mov dl, colour
 
         print_loop:
 
-                mov al, cs:[si]         ; lodsb 
-                inc si                  ;          ds is changed???
-                call draw_symbol    ; es:[DI++] = AL
+                lodsb              
+                call draw_symbol_right    
+
+                lodsb               
+                call draw_symbol_right   
+
+                lodsb                     ; al = ds:[SI++]
+                call draw_symbol_right    ; es:[DI++] = AL
+
+                add di, 160 - 6
 
                 loop print_loop
 
+
+
+                ret
+                endp
+
+;======================================================================
+;                       draw_symbol_right
+;======================================================================
+; 
+; Require : colour in dl
+;
+; Dest: si,
+;----------------------------------------------------------------------
+draw_symbol_right     proc
+
+                push ax                         ; TODO: mov ah, dl stosw
+
+                stosb       ; ds[si++] = al
+                mov al, dl
+                stosb
+
+                pop ax
                 ret
                 endp
 
 
 
+text_reg db 'raxrbxrcxdrx'
 
 EndOfProg:
 
