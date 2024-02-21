@@ -106,7 +106,7 @@ ramka_interrupt         proc
 	        call draw_ramk
                 pop cx di si dx
 
-                call draw_reg
+                call draw_registers
 
 
 ;; ------------------blink 61 port higher bit--------------------------
@@ -175,8 +175,8 @@ not_start_symbol:
 	up = 0cdh
 	down = 0cdh
 
-	width_ramka = 15
-	length_ramka = 10
+	width_ramka = 10
+	length_ramka = 12
 
 	symbol_count = 80*2
 
@@ -298,31 +298,20 @@ draw_ramk	proc
 
 
 ;; =====================================================================
-;;                          draw_reg
+;;                          draw_registers
 ;; =====================================================================
 ;; draws regs
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;; Expect: 
-;;
-;;
-;; Entry: 
-;;
-;;
-;; Return: 
-;;
-;;
-;; Note: 
-;;
 ;;
 ;; Call Convention: CDECL
 ;;
-;; Side Effects:
+;; Side Effects: draws registers
 ;;
-;; Destr: 
+;; Destr: /CX/  /SI/  /DI/  /DL/
 ;; ---------------------------------------------------------------------
-draw_reg        proc
+draw_registers        proc
 
-        mov cx, 4
+        mov cx, 12
         mov si, offset text_reg
         mov di, 160 + 2
         mov dl, colour
@@ -332,13 +321,10 @@ draw_reg        proc
                 lodsb              
                 call draw_symbol_right    
 
-                lodsb               
-                call draw_symbol_right   
-
                 lodsb                     ; al = ds:[SI++]
                 call draw_symbol_right    ; es:[DI++] = AL
 
-                add di, 160 - 6
+                add di, 160 - 4
 
                 loop print_loop
 
@@ -359,9 +345,12 @@ draw_symbol_right     proc
 
                 push ax                         ; TODO: mov ah, dl stosw
 
-                stosb       ; ds[si++] = al
-                mov al, dl
-                stosb
+                stosb                           ; ds[si++] = al
+                mov al, dl                      ; draw name of register
+                stosb                           ;
+
+                
+
 
                 pop ax
                 ret
@@ -369,7 +358,7 @@ draw_symbol_right     proc
 
 
 
-text_reg db 'raxrbxrcxdrx'
+text_reg db 'axbxcxdxsidibpspdsessscs'
 
 EndOfProg:
 
