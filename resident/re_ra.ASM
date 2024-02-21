@@ -364,9 +364,7 @@ draw_register_line     proc
 
 
                 mov al, bl
-                 call draw_register_value
-
-
+                call draw_register_value
 
 
 
@@ -420,7 +418,7 @@ draw_register_value             proc
 
                                 xor ah, ah
 
-                                mov al, cl
+                                mov cl, al
 
                                 and al, 11110000b       ; so we get elder number of al
 
@@ -430,7 +428,7 @@ draw_register_value             proc
 
                                 add bx, ax              
 
-                                mov al, cs:[bx]         ; print elder number of al
+                                mov al, [bx]            ; print elder number of al
                                 stosb                   ;
 
                                 mov al, dl
@@ -443,7 +441,7 @@ draw_register_value             proc
                                 mov bx, offset hex_alphabet
                                 add bx, ax   
 
-                                mov al, cs:[bx]         ; print elder number of al
+                                mov al, [bx]            ; print elder number of al
                                 stosb                   ;
 
                                 mov al, dl
