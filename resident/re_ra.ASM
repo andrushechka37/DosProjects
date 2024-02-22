@@ -17,6 +17,7 @@ size_sym_line                  =  80
 
 Start:
 
+
 ;; ------------------Save old address------------------------------------
 
         mov ah, 35h                                      ;
@@ -24,7 +25,7 @@ Start:
         int 21h                                          ; returns /ES/:/BX/ of IRQ + 8
 
         mov dedault_IRQ1_address_offset, bx              ;
-        mov bx, es                                       ; save segment and offset for old addres
+        mov bx, es                                       ; save segment and offset for old addres for 09h interrupt
         mov dedault_IRQ1_address_segment, bx             ;
        
 ;; ---------------------------------------------------------------------
@@ -34,19 +35,19 @@ Start:
 ;; ------------------Rewrite interrupt address--------------------------
 
         push 0                                                             ;
-        pop es                                                             ; es = 0  | table of addresses of sis funcs in yhe begin of memory
+        pop es                                                             ; es = 0  | table of addresses of sis funcs in the begin of memory
 
-        mov bx, size_of_interupt_func_adress * (number_of_irq + 08h)       ; IRQ1 interrupt vector address (number 0f IRQ + 8)
-                                                                           ; 4 because offset + segment
+        mov bx, 4 * (number_of_irq + 08h)                                  ; IRQ1 interrupt vector address (number 0f IRQ + 8)
+                                                                           ; 4 because offset(2) + segment(2)
 
         cli                                                                ; prohibit interruptions
 
-        mov es:[bx], offset ramka_interrupt                                ; addr offset
+        mov es:[bx], offset ramka_interrupt                                ; new addr offset
 
 	push cs                                                            ; to get our segment
 	pop ax                                                             ;
 
-        mov es:[bx + 2], ax                                                ; addr segment
+        mov es:[bx + 2], ax                                                ; new addr segment
 
         sti                                                                ; allow interruptions
 
@@ -58,13 +59,13 @@ Start:
 
 	mov dx, offset EndOfProg                ; address of end of programm
 	shr dx, 4                               ; length in paragraphs
-	inc dx 		                        ; sizeof(prog) / 16 + 1
+	inc dx 		                        ; (sizeof(prog) / 16) + 1
 
 	mov ax, 3100h                           ;
 	int 21h                                 ; Terminate and stay resident
 						; ----------------------------
 						; in dx quantity of paragraphs
-						; stores in memory dx paragraphs beginning from cs
+						; stores in memory beginning from cs
 						; ----------------------------
 
 ;; ---------------------------------------------------------------------
@@ -74,8 +75,19 @@ Start:
 ;;                         ramka_interrupt 
 ;; =====================================================================
 ;; analog to  stantart 09h interrupt
+;; draws a frame in left up corner 
+;; in frame a shown values of all registers
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;; Side Effects: draws ramka in up left corner
+;;
+;; Expect: 09h interrupt is changed to this func
+;;
+;;
+;; Note: draw ramka func is awful
+;;
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draws a frame in left up corner  
 ;;
 ;; Destr: -
 ;; ---------------------------------------------------------------------
@@ -92,23 +104,22 @@ ramka_interrupt         proc
 		push begin_of_video_mem
 		pop es
 
-                in al, 60h
+                in al, 60h                                      ; scan value from keyboard port
 
 		cmp al, start_symbol
 		jne not_start_symbol
 
 ;; ----------------------restore ds value----------------------------------------
 
-                push cs
-                pop ds
+                push cs                                         ; ds can be destroyed
+                pop ds                                          ; we restore it to use 
+                                                                ; lotsb/stosb
 
-;; ------------------------------------------------------------------------------
+;; ------------------------draw segment------------------------------------------
 
-                mov bx, 0	; begin of ramk
+                mov bx, 0	                                ; begin of ramk
 
-                push dx si di cx
 	        call draw_ramk 
-                pop cx di si dx
 
                 call draw_registers
 
@@ -141,16 +152,15 @@ not_start_symbol:
 
 	        db 0EAh					        ; long jump
                 dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
-                dedault_IRQ1_address_segment  dw 0		;
+                dedault_IRQ1_address_segment  dw 0		; ---------------------------------------------------------------
+                
+;;              iret       <----------------------------------- ; we don`t need to put iret here
+                                                                ; because we jump to old func, not call it
+                endp                                            ; so iret in it will do all work
 
-;; ---------------------------------------------------------------------
 
-        iret
-        endp
 
 ;; -------------------------------------------------------------------RAMKA---------------------------------------------------------------------------------------------------------------
-
-
 
 ;-----------------------------consts----------------------------------
 
@@ -178,19 +188,27 @@ not_start_symbol:
 ;----------------------------------------------------------------------
 
 
-;----------------------------------------------------------------------
-; Draw a given symbol
-;
-; Entry:
-;	
-;	AL - symbol
-;	bx - part adress(ofset)
-;
-; Assume:
-;
-;	es = ob800h
-;----------------------------------------------------------------------
 
+;; =====================================================================
+;;                          draw_sym
+;; =====================================================================
+;; Draw a given symbol
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: es = ob800h
+;;
+;;
+;; Entry:       /AL/  --  symbol to draw
+;;      
+;;              /BX/  -- part adress(ofset)
+;;
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draw a given symbol
+;;
+;; Destr: -
+;; ---------------------------------------------------------------------
 draw_sym	proc
 		
 		mov byte ptr es:[bx], al
@@ -198,25 +216,39 @@ draw_sym	proc
 		ret
 
 		endp
-;----------------------------------------------------------------------
-; Draw a line in console with givem width
-;
-; Entry:
-;	AL - first symbol
-;	AH - middle elements
-;	DH - last elem
-;
-; Destr:  DL BX AL CX
-;
-;----------------------------------------------------------------------
 
+
+
+
+
+;; =====================================================================
+;;                          draw_line
+;; =====================================================================
+;; Draw a line in console with givem width
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: es = ob800h
+;;
+;;
+;; Entry:       /AL/  --  first symbol in line             
+;;
+;;              /AH/  --  middle symbol in line
+;;
+;;              /DH/  --  last symbol in line
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draws line
+;;
+;; Destr: /DL/  /BX/  /AL/  /CX/
+;; ---------------------------------------------------------------------
 draw_line	proc
 
                 push bp
 
 		mov DL, AL
-		call draw_sym	; draws first symbol
-		add bx, 2       ; move to the next place
+		call draw_sym	        ; draws first symbol
+		add bx, 2               ; move to the next place
 
 		mov al, ah		; make al the second symbol
 
@@ -226,7 +258,7 @@ draw_line	proc
 
 		Cycle_draw_line:
 
-		call draw_sym   ; draw al
+		call draw_sym           ; draw al
 
 		add bx, 2		; bx += 2
 		
@@ -246,14 +278,26 @@ draw_line	proc
 		ret
 	
 		endp
-;----------------------------------------------------------------------
-; Draw a ramka using draw a line
-;
-; Use constants given in the top of the program
-;
-; Destr: AX, DX BX CX
-;----------------------------------------------------------------------
 
+
+;; =====================================================================
+;;                        draw_ramk  
+;; =====================================================================
+;; Draw a ramka using draw a line
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: es = ob800h
+;;
+;;
+;; Entry:       use consts given upper
+;;
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draw ramka
+;;
+;; Destr: /AX/  /BX/  /CX/  /DX/
+;; ---------------------------------------------------------------------
 draw_ramk	proc
 
 		mov al, up_left 	;
@@ -292,11 +336,17 @@ draw_ramk	proc
 		endp
 
 
+
 ;; =====================================================================
-;;                          draw_registers
+;;                     draw_registers     
 ;; =====================================================================
-;; draws regs
+;; draws registers and their values in up left frame
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: -
+;;
+;;
+;; Entry:       consts(maybe name them)
 ;;
 ;; Call Convention: CDECL
 ;;
@@ -306,8 +356,8 @@ draw_ramk	proc
 ;; ---------------------------------------------------------------------
 draw_registers        proc
 
-        mov cx, number_of_print_registers
-        mov si, offset text_reg
+        mov cx, number_of_print_registers       
+        mov si, offset text_reg             ; array with names of regs
 
         mov di, 160 + 2                     ; left up corner, but -> 1 and 1 down   
         mov dl, colour                      ;                                 
@@ -317,25 +367,34 @@ draw_registers        proc
                   
                 call draw_register_line    ; draws "ax: 0000"
 
-                add di, 160 - 18          ; go to the next line (\n)
+                add di, 160 - 18           ; go to the next line (\n)
 
                 loop print_loop
 
                 ret
                 endp
 
-;======================================================================
+
+
+;; =====================================================================
 ;                       draw_register_line
-;======================================================================
-; 
-; Require : colour in dl
-;
-; Dest: si,
-;----------------------------------------------------------------------
+;;                          
+;; =====================================================================
+;; draws line like "ax: 0000"
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect:      /DL/  --  colour 
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects: draws line like "ax: 0000"
+;;
+;; Destr: /SI/
+;; ---------------------------------------------------------------------
 draw_register_line     proc
 
 
-                push ax                         ; TODO: mov ah, dl stosw
+                push ax                        
                 push bx
 
                 mov al, ' '
@@ -354,22 +413,22 @@ draw_register_line     proc
                 call draw_symbol_for_registers
 ;; ---------------------------------------------------------------------
 
-                mov ax, [bp]
+                mov ax, [bp]                    ; take original value from stack
 
-                mov bl, al              ; firstly print elder number
-                mov al, ah              ;
+                mov bl, al                      ; firstly print elder number
+                mov al, ah                      ; al = ah
+
 
                 call draw_register_value
 
+ 
 
-
-                mov al, bl
-                call draw_register_value
-
+                mov al, bl                      ; al = al
+                call draw_register_value        ; print al
 
 
                 inc bp                           ; add bp, 2
-                inc bp                           ;
+                inc bp                           ; it is faster
 
                 pop bx
                 pop ax
@@ -382,11 +441,10 @@ draw_register_line     proc
 ;; another draw symbol because in draw ramka draw_sym is huina
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;
-;; Call Convention: CDECL
 ;;
-;; Side Effects: draws symbol and colour in /ES/ : [/DI/]
+;; Side Effects: draws symbol and colour in /ES/ : [DI]
 ;;
-;; Destr: 
+;; Destr: /DI/  /AL/
 ;; ---------------------------------------------------------------------
 draw_symbol_for_registers       proc
 
@@ -398,17 +456,23 @@ draw_symbol_for_registers       proc
                                 endp
 
 
+
 ;; =====================================================================
 ;;                          draw_register_value
 ;; =====================================================================
 ;; draws reg value not as symbol but as hex number
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;; Entry: /AL/  --  symbol to draw
+;;
+;; Expect: es = 0b800h
 ;;
 ;;
-;; Side Effects:
+;; Entry: /AL/  --  symbol to draw 
 ;;
-;; Destr: 
+;;
+;; Call Convention: CDECL
+;;
+;;
+;; Destr: /DI/
 ;; ---------------------------------------------------------------------
 draw_register_value             proc
 
@@ -418,21 +482,21 @@ draw_register_value             proc
 
                                 xor ah, ah
 
-                                mov cl, al
+                                mov cl, al                              ; save al
 
-                                and al, 11110000b       ; so we get elder number of al
+                                and al, 11110000b                       ; so we get elder number of al
 
-                                rol al, 4               ; so we get number 0-15
+                                rol al, 4                               ; so we get number 0-15 (it is offset in hex_alphabet)
 
-                                mov bx, offset hex_alphabet
+                                mov bx, offset hex_alphabet             
 
-                                add bx, ax              
+                                add bx, ax                              ; bx is address of needed symbol
 
-                                mov al, [bx]            ; print elder number of al
-                                stosb                   ;
+                                mov al, [bx]                            ; print elder number of al
+                                stosb                                   ;
 
-                                mov al, dl
-                                stosb
+                                mov al, dl                              ; colour
+                                stosb                                   ;
 
 
                                 mov al, cl
@@ -441,11 +505,11 @@ draw_register_value             proc
                                 mov bx, offset hex_alphabet
                                 add bx, ax   
 
-                                mov al, [bx]            ; print elder number of al
-                                stosb                   ;
+                                mov al, [bx]                            ; print younger number of al
+                                stosb                                   ;
 
-                                mov al, dl
-                                stosb
+                                mov al, dl                              ; colour
+                                stosb                                   ;
 
 
                                 pop cx
