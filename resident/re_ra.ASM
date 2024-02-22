@@ -160,7 +160,7 @@ not_start_symbol:
                 
 ;;              iret       <----------------------------------- ; we don`t need to put iret here
                                                                 ; because we jump to old func, not call it
-                endp                                            ; so iret in it will do all work
+                endp                                            ; so iret in old func will do all work
 
 
 
@@ -304,24 +304,24 @@ draw_line	proc
 ;; ---------------------------------------------------------------------
 draw_ramk	proc
 
-		mov al, up_left 	;
+		mov al, up_left 	        ;
 		mov ah, up			; => first line
-		mov dh, up_right	;
+		mov dh, up_right	        ;
 
 		call draw_line
 
 		add bx, symbol_count
 		sub bx, (width_ramka + 2)*2
 
-		mov al, middle_left 	;
+		mov al, middle_left 	            ;
 		mov ah, ' '			    ; => body lines
-		mov dh, middle_right	;
+		mov dh, middle_right	            ;
 
 		mov cx, length_ramka
 
 		Cycle_draw_body:
 
-		call draw_line   ; draw line
+		call draw_line                  ; draw line
 
 		add bx, symbol_count		; bx += 80 (next line) ! magic const
 		sub bx, (width_ramka + 2)*2
@@ -360,18 +360,18 @@ draw_ramk	proc
 ;; ---------------------------------------------------------------------
 draw_registers        proc
 
-        mov cx, number_of_print_registers       
-        mov si, offset text_reg             ; array with names of regs
+                mov cx, number_of_print_registers       
+                mov si, offset text_reg             ; array with names of regs
 
-        mov di, 160 + 2                     ; left up corner, but -> 1 and 1 down   
-        mov dl, colour                      ;                                 
-                                            ;
+                mov di, 160 + 2                     ; left up corner, but -> 1 and 1 down   
+                mov dl, colour                      ;                                 
+                                                    ;
         print_loop:
 
                   
-                call draw_register_line    ; draws "ax: 0000"
+                call draw_register_line             ; draws "ax: 0000"
 
-                add di, 160 - 18           ; go to the next line (\n)
+                add di, 160 - 18                    ; go to the next line (\n)
 
                 loop print_loop
 
@@ -408,7 +408,7 @@ draw_register_line     proc
                 call draw_symbol_for_registers  ; first letter        
                 
                 lodsb                           ;
-                call draw_symbol_for_registers  ; sec number      
+                call draw_symbol_for_registers  ; sec letter     
 
                 mov al, ':'
                 call draw_symbol_for_registers
