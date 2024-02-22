@@ -94,7 +94,7 @@ Start:
 ramka_interrupt         proc
 
 
-                push ss es ds sp bp di si dx cx bx ax           ; push all regs to stack to print them
+                push cs ss es ds sp bp di si dx cx bx ax           ; push all regs to stack to print them
                                                                 ; correctly
 
                 mov bp, sp                                      ; save bp, pointed to ax
@@ -142,6 +142,9 @@ ramka_interrupt         proc
 ;; ---------------------------------------------------------------------
 
                 pop ax bx cx dx si di bp sp ds es ss
+
+                add sp, 2               ; pop cs
+
                 iret
 
 ;; -------------jump to old adress of interrupt-------------------------
@@ -149,6 +152,7 @@ ramka_interrupt         proc
 not_start_symbol:
 
                 pop ax bx cx dx si di bp sp ds es ss            ; restore old regs
+                add sp, 2                                       ; pop cs
 
 	        db 0EAh					        ; long jump
                 dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
