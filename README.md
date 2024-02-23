@@ -1,3 +1,7 @@
+# Resident regs value
+## start by pressing "magic key"
+![ramk09h](/images/4.png)
+
 # RAMKA UPGRADE
 
 ![str3](/images/3.png)
