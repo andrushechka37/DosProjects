@@ -18,11 +18,15 @@ size_sym_line                  =  80
 Start:
 
 
-;; ------------------Save old address------------------------------------
+;; ------------------Save old address for IRQ1--------------------------------
+
+        cli                                              ; prohibit interruptions
+;           <---------------------------------           ; PPI can rewrite adress of interrupt
+                                                         ; so it is placed here
 
         mov ah, 35h                                      ;
-        mov al, number_of_irq + 08h                      ;
-        int 21h                                          ; returns /ES/:/BX/ of IRQ + 8
+        mov al, 01h + 08h                                ;
+        int 21h                                          ; returns /ES/ : /BX/ of IRQ + 8
 
         mov dedault_IRQ1_address_offset, bx              ;
         mov bx, es                                       ; save segment and offset for old addres for 09h interrupt
@@ -32,17 +36,48 @@ Start:
 
 
 
-;; ------------------Rewrite interrupt address--------------------------
+;; ------------------Rewrite interrupt address of IRQ1------------------
+
+        push 0                                  ;
+        pop es                                  ; es = 0  | table of addresses of sistеm interruptions
+                                                ; in the begin of memory
+
+        mov bx, 4 * 09h                         ; IRQ1 interrupt vector address (number 0f IRQ + 8)
+                                                ; 4 because offset(2) + segment(2)
+
+
+        mov es:[bx], offset ramka_interrupt     ; new addr offset
+
+	push cs                                 ; to get our segment
+	pop ax                                  ;
+
+        mov es:[bx + 2], ax                     ; new addr segment
+
+        sti                                     ; allow interruptions
+
+;; ---------------------------------------------------------------------
+
+
+;; --------------------------do upper actions for IRQ0------------------
+
+        cli                                                                ; prohibit interruptions
+
+        mov ah, 35h                                                        ;
+        mov al, 08h                                                        ;
+        int 21h                                                            ; returns /ES/:/BX/ of IRQ + 8
+
+        mov dedault_IRQ0_address_offset, bx                                ;
+        mov bx, es                                                         ; save segment and offset for old addres for 08h interrupt
+        mov dedault_IRQ0_address_segment, bx                               ;
 
         push 0                                                             ;
         pop es                                                             ; es = 0  | table of addresses of sis funcs in the begin of memory
 
-        mov bx, 4 * (number_of_irq + 08h)                                  ; IRQ1 interrupt vector address (number 0f IRQ + 8)
+        mov bx, 4 * 08h                                                    ; IRQ1 interrupt vector address (number 0f IRQ + 8)
                                                                            ; 4 because offset(2) + segment(2)
 
-        cli                                                                ; prohibit interruptions
 
-        mov es:[bx], offset ramka_interrupt                                ; new addr offset
+        mov es:[bx], offset timer_interrupt                                ; new addr offset
 
 	push cs                                                            ; to get our segment
 	pop ax                                                             ;
@@ -50,12 +85,12 @@ Start:
         mov es:[bx + 2], ax                                                ; new addr segment
 
         sti                                                                ; allow interruptions
-
 ;; ---------------------------------------------------------------------
 
+
+
+
 ;; ------------------Terminate and stay resident------------------------
-
-
 
 	mov dx, offset EndOfProg                ; address of end of programm
 	shr dx, 4                               ; length in paragraphs
@@ -93,35 +128,14 @@ Start:
 ;; ---------------------------------------------------------------------
 ramka_interrupt         proc
 
-
-                push cs ss es ds sp bp di si dx cx bx ax           ; push all regs to stack to print them
-                                                                ; correctly
-
-                mov bp, sp                                      ; save bp, pointed to ax
-
-;; ------------------main seg of interrupt-----------------------------------------
-
-		push begin_of_video_mem
-		pop es
+                push ax
 
                 in al, 60h                                      ; scan value from keyboard port
 
-		cmp al, start_symbol
+		cmp al, start_symbol                            
 		jne not_start_symbol
 
-;; ----------------------restore ds value----------------------------------------
-
-                push cs                                         ; ds can be destroyed
-                pop ds                                          ; we restore it to use 
-                                                                ; lotsb/stosb
-
-;; ------------------------draw segment------------------------------------------
-
-                mov bx, 0	                                ; begin of ramk
-
-	        call draw_ramk 
-
-                call draw_registers
+                mov cs:frame_flag, 1                            ; ds is desroyed
 
 ;; ------------------blink 61 port higher bit--------------------------
 	
@@ -134,26 +148,24 @@ ramka_interrupt         proc
 
 ;; ---------------------------------------------------------------------
 
+
 ;; ------------------EOI-----------------------------------------------
 
-		mov al, 20h						; say to PPI that our interrupt is over
-		out 20h, al						; so other interrupts can play
+		mov al, 20h			; say to PPI that our interrupt is over
+		out 20h, al		        ; so other interrupts can play
+
+;; -------------end of processing by my interrupt----------------------
+
+                pop ax
+                iret
 
 ;; ---------------------------------------------------------------------
 
-                pop ax bx cx dx si di bp sp ds es ss
-
-                add sp, 2               ; pop cs
-
-                iret
 
 ;; -------------jump to old adress of interrupt-------------------------
 
 not_start_symbol:
-
-                pop ax bx cx dx si di bp sp ds es ss            ; restore old regs
-                add sp, 2                                       ; pop cs
-
+                pop ax
 	        db 0EAh					        ; long jump
                 dedault_IRQ1_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
                 dedault_IRQ1_address_segment  dw 0		; ---------------------------------------------------------------
@@ -220,8 +232,6 @@ draw_sym	proc
 		ret
 
 		endp
-
-
 
 
 
@@ -350,7 +360,7 @@ draw_ramk	proc
 ;; Expect: -
 ;;
 ;;
-;; Entry:       consts(maybe name them)
+;; Entry: consts(maybe name them)
 ;;
 ;; Call Convention: CDECL
 ;;
@@ -360,12 +370,16 @@ draw_ramk	proc
 ;; ---------------------------------------------------------------------
 draw_registers        proc
 
+;; ------------------settings for printing regs------------------------
+
                 mov cx, number_of_print_registers       
                 mov si, offset text_reg             ; array with names of regs
 
                 mov di, 160 + 2                     ; left up corner, but -> 1 and 1 down   
                 mov dl, colour                      ;                                 
-                                                    ;
+                                                    
+;; ------------------printing regs itself-----------------------------
+
         print_loop:
 
                   
@@ -381,8 +395,7 @@ draw_registers        proc
 
 
 ;; =====================================================================
-;                       draw_register_line
-;;                          
+;;                       draw_register_line
 ;; =====================================================================
 ;; draws line like "ax: 0000"
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,48 +404,69 @@ draw_registers        proc
 ;;
 ;; Call Convention: CDECL
 ;;
+;;
+;; Note:
+;;
+;;                ax
+;;         ah            al
+;;     |________|    |________|
+;;                     
+;;     |___||___|    |___||___|
+;;         ^              ^
+;;         |              |
+;;         +--------------+
+;;          half of bytes
+;;
+;;      we transform halfs of bytes to hex number 
+;;      and print them in the right order
+;;
+;;
 ;; Side Effects: draws line like "ax: 0000"
 ;;
 ;; Destr: /SI/
 ;; ---------------------------------------------------------------------
 draw_register_line     proc
 
-
                 push ax                        
                 push bx
+
+;; ------------------printing " ax: "----------------------------------
 
                 mov al, ' '
                 call draw_symbol_for_registers
 
                 lodsb                           ;
-                call draw_symbol_for_registers  ; first letter        
+                call draw_symbol_for_registers  ; first letter of register name        
                 
                 lodsb                           ;
-                call draw_symbol_for_registers  ; sec letter     
+                call draw_symbol_for_registers  ; second letter of register name     
 
                 mov al, ':'
                 call draw_symbol_for_registers
 
                 mov al, ' '
                 call draw_symbol_for_registers
+
 ;; ---------------------------------------------------------------------
+
+
+;; ---------------------------printing value of register----------------
 
                 mov ax, [bp]                    ; take original value from stack
 
                 mov bl, al                      ; firstly print elder number
-                mov al, ah                      ; al = ah
+                mov al, ah                      ; 
 
 
                 call draw_register_value
 
- 
 
-                mov al, bl                      ; al = al
-                call draw_register_value        ; print al
+                mov al, bl                      ; print younger number
+                call draw_register_value        ; 
 
 
                 inc bp                           ; add bp, 2
-                inc bp                           ; it is faster
+                inc bp                           ; (it is faster)
 
                 pop bx
                 pop ax
@@ -444,7 +478,6 @@ draw_register_line     proc
 ;; =====================================================================
 ;; another draw symbol because in draw ramka draw_sym is huina
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;
 ;;
 ;; Side Effects: draws symbol and colour in /ES/ : [DI]
 ;;
@@ -460,7 +493,6 @@ draw_symbol_for_registers       proc
                                 endp
 
 
-
 ;; =====================================================================
 ;;                          draw_register_value
 ;; =====================================================================
@@ -471,6 +503,36 @@ draw_symbol_for_registers       proc
 ;;
 ;;
 ;; Entry: /AL/  --  symbol to draw 
+;;
+;;
+;; Note:
+;;
+;;                ax
+;;         ah            al
+;;     |________|    |________|
+;;                     
+;;     |___||___|    |___||___|
+;;         ^              ^
+;;         |              |
+;;         +--------------+
+;;          half of bytes
+;;
+;;      we transform halfs of bytes to hex number 
+;;      and print them in the right order
+;;
+;; -----------------------------------------------------------
+;;              al
+;;      |something|something|      ==  && 0000|1111b => 
+;;
+;;
+;;
+;;   => |000000000|something|     0d <= something <= 15
+;;                      ^                   ^
+;;                      |                   |
+;;                      +-------------------+
+;;                         offset in array
+;;                                    |
+;;                                    + --------------------------> "123456789abcdef"
 ;;
 ;;
 ;; Call Convention: CDECL
@@ -524,9 +586,83 @@ draw_register_value             proc
                                 ret
                                 endp
 
+
+
+
+;; =====================================================================
+;;                          timer_interrupt
+;; =====================================================================
+;; checks flag to draw or not to draw frame
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: 
+;;
+;;
+;; Entry: 
+;;
+;;
+;; Return: 
+;;
+;;
+;; Note: 
+;;
+;;
+;; Call Convention: CDECL
+;;
+;; Side Effects:
+;;
+;; Destr: 
+;; ---------------------------------------------------------------------
+timer_interrupt         proc
+
+
+                        cmp cs:frame_flag, 1
+                        jne dont_draw_frame
+
+;; ------------------main seg of interrupt-----------------------------------------
+
+                        push cs ss es ds sp bp di si dx cx bx ax        ; push all regs to stack to print them
+                                                                        ; correctly
+
+                        mov bp, sp                                      ; save bp, pointed to ax
+
+
+                        push begin_of_video_mem
+		        pop es
+
+;; ----------------------restore ds value----------------------------------------
+
+                        push cs                                         ; ds can be destroyed
+                        pop ds                                          ; we restore it to use 
+                                                                        ; lotsb/stosb
+;; ------------------------------------------------------------------------------
+
+
+
+
+;; ------------------------draw segment------------------------------------------
+
+                        mov bx, 0	                                ; begin of ramk
+
+	                call draw_ramk 
+
+                        call draw_registers
+
+                        pop ax bx cx dx si di bp sp ds es ss            ; restore old regs
+                        add sp, 2                                       ; pop cs
+
+        dont_draw_frame:
+                        db 0EAh					        ; long jump
+                        dedault_IRQ0_address_offset   dw 0		; long jump /dedault_IRQ1_address_segment/ : /dedault_IRQ1_address_offset/
+                        dedault_IRQ0_address_segment  dw 0		; ---------------------------------------------------------------
+                        endp
+                        
+
 text_reg db 'axbxcxdxsidibpspdsessscs'
 
 hex_alphabet db '0123456789abcdef'
+
+frame_flag db 2
 
 EndOfProg:
 
