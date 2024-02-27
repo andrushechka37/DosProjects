@@ -271,3 +271,30 @@ memmove_asm     proc
                 endp
 
 end Start
+
+
+
+
+        mov ah, 09h                 ;
+        mov dx, offset new_str      ; print("\n")
+        int 21h                     ;
+
+
+
+
+
+        
+
+        add dx, 2                   ; skip len and max    
+        mov ah, 09h                 ; 
+        int 21h                     ; print input password
+
+        mov dx, offset new_str      ; print("\n")
+        int 21h                     ;
+
+        mov dx, offset right_password
+        int 21h
+
+        mov dx, offset new_str      ; print("\n")
+        int 21h                     ;
+
