@@ -16,28 +16,8 @@ LEN_OF_PASSWORD = 6
         
 Start:
 
-        mov ah, 09h                 ;
-        mov dx, offset new_str      ; print("\n")
-        int 21h                     ;
-
         call get_password
         call transform_password
-
-
-        add dx, 2                   ; skip len and max    
-        mov ah, 09h                 ; 
-        int 21h                     ; print input password
-
-        mov dx, offset new_str      ; print("\n")
-        int 21h                     ;
-
-        mov dx, offset right_password
-        int 21h
-
-        mov dx, offset new_str      ; print("\n")
-        int 21h                     ;
-
-
 
         call check_password
         call give_access
@@ -46,12 +26,6 @@ Start:
 
         mov ax, EXIT_CODE    ; Terminate
         int 21h              ;
-
-
-
-
-
-
 
 
 
@@ -102,7 +76,7 @@ transform_password          proc
                 xor cx, cx
 
                 mov cl, [bx + 1]            ; cx = len of array
-                sub cl, 2                   ; not to spoil '$' in the end
+                sub cl, 1                   ; not to spoil '$' in the end
 
                 add bx, 2                   ; skip len and max
 
@@ -184,8 +158,8 @@ give_access     proc
 
                 mov ah, 09h
 
-                cmp is_password_right, 1
-                je eqaual_pass
+                cmp is_password_right, 0
+                jne eqaual_pass
 
                 mov dx, offset wrong_input
                 int 21h
@@ -202,78 +176,45 @@ give_access     proc
 
 
 
-
-
-
-
-
-
-
-;----------------------------------------------------------------------
-;                           memcmp_asm
-;----------------------------------------------------------------------
-;
-;
-; Entry:
-;
-;   1 arg - ptr to array_1
-;   2 arg - ptr to array_2
-;   3 arg - size of compare area
-;
-; Destr:
-;   es, di, di, si, cx
-;
-; Ret: cx (not to spoil ax)
-;
-;   cx =  0  -> arrays are equal
-;   cx = -1  -> 2 array is bigger
-;   cx =  1  -> 1 array is bigger
-;-----------------------------------------
+;; =====================================================================
+;;                          memcmp_asm
+;; =====================================================================
+;; works like standart memcmp
+;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;;
+;; Expect: /ES/ = /DS/
+;;
+;;        
+;;
+;;
+;; Entry: 1 arg  --  offset to 1 array
+;;
+;;        2 arg  --  offset to 2 array
+;;
+;;        3 arg  --  len of arrays(comnpare area)
+;;
+;;
+;; Destr: /ES/  /SI/  /DI/  /CX/
+;; ---------------------------------------------------------------------
 memcmp_asm      proc
-                CLD                 ; increment
 
                 push ds
                 pop es
 
-                push BP             ; save bp
-                mov BP, SP  
 
-                mov DI, [BP + 4]    ; bx = 1 arr 1
-                mov SI, [BP + 6]    ; al = 2 arr 2
-                mov cx, [BP + 8]    ; ah = 3 size
+                pop si
+                pop di
+                pop cx
 
-                repe cmpsb          ; cmp ds:[SI++] to es:[DI++] | (SI - DI)
 
-                je equal_memcpy
-                ja second_bigger
-                jmp first_bigger
 
-    equal_memcpy:
 
-                mov cx, 0
-                jmp  end_mempy 
-    second_bigger:
-
-                mov cx, -1
-                jmp  end_mempy
-    first_bigger:
-
-                mov cx, 1
-                jmp  end_mempy       
-
-    end_mempy:
-                pop bp
-                ret 6
+                ret
                 endp
-
 
 
 right_input db "pravilno!!!$"
 wrong_input db "nepravilno$"
-
-
-
-
 
 
 
@@ -287,10 +228,17 @@ str_buffer:
 
        db 100                       ; max chars to enter
 buffer db 8 DUP (?)                 ; password buffer
+
+;<------------------------ a place for canary-----------------------------------------------------------------------------------------------------------
+
 is_password_right    db 0
 
-right_password db "233211$"
+;<------------------------ a place for canary-----------------------------------------------------------------------------------------------------------
+; write check canaries
+
+right_password db "233211"
 
 
 
 end Start
+
