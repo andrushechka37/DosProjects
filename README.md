@@ -1,21 +1,49 @@
-# Resident regs value
-## start by pressing "magic key"
+# CRACK
+## Задание: взломать *.com файл при помощи различных утилит.
+
+## В работе использовались:
++ IDA
++ Turbo Debugger
++ Hex editor in VSCode 
+
+# Ход работы
+
+## Поиск уязвимостей в коде оппонента и использование уязвимостей программы:
+При помощи IDA был дизассмблирован и тщательно отсмотрен файл оппонента. Была найдена уязвимость, проявляющаяся при переполнении буфера: правильный пароль лежал в памяти рядом с буфером. После изучения механизма хранения вводимого пароля в памяти буфер был пробит комбинацией "333331111111.....", так как вводимый пароль уменьшался на 2 при вводе.
+![overflow](/images/overflow.png)
+![crack](/images/crack.png)
+
+## Взлом при помощи "бинарного патча"
+
+При просмотре кода программы был замечен jump "прыгающий" на завершение программы, вместо предоставления доступа. Этот досадный участок кода был "заnopлен" при помощи программы `crack_file.cpp`.
+
+![grapth](/images/grapth.png)
+![hex](/images/hex.png)
+
+После нашего патча программа наконец работает корректно, принимая буквально любой пароль за верный:
+![patch](/images/patch.png)
+
+> [!CAUTION]
+> # Далее идет плохой участок README, написанный, чтобы репозиторий выглядел повеселее.
+
+## Resident regs value
+### start by pressing "magic key"
 ![ramk09h](/images/4.png)
 
-# RAMKA UPGRADE
+## RAMKA UPGRADE
 
 ![str3](/images/3.png)
 
 
-# RAMKA
+## RAMKA
 ## Draws ramka with given parametres:
 
 ![ramka](/images/ramk.png)
 
 
-# Str func
-## Some mem_funcs realized in assembler
-### Example:
+## Str func
+### Some mem_funcs realized in assembler
+#### Example:
 
 ![str1](/images/1.png)
 ![str2](/images/2.png)

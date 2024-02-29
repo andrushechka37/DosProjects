@@ -10,6 +10,7 @@ org 100h
 KEYBOARD_ENTER  = 0ah
 EXIT_CODE       = 4c00h
 LEN_OF_PASSWORD = 6
+LEN_OF_CANARY   = 3
 
 ;; ---------------------------------------------------------------------
 
@@ -111,20 +112,13 @@ transform_password          proc
 ;; ---------------------------------------------------------------------
 check_password       proc
 
-;; ----------------------------memcmp-----------------------------------
+;; ----------------------------memcmp-----------------------------------   
 
-                cld
+                push LEN_OF_PASSWORD
+                push offset str_buffer + 2
+                push offset right_password
 
-                mov si, offset right_password   ; 1 array
-                mov di, offset str_buffer       ; 2 array
-                add di, 2                       ; skip len and size
-
-                push ds                         ;
-                pop es                          ; es = ds
-
-                mov cx, LEN_OF_PASSWORD         
-
-                repe cmpsb                      ; cmp ds:[SI++] to es:[DI++] | (SI - DI)
+                call memcmp_asm
 
 ;; ---------------------------------------------------------------------
 
@@ -136,11 +130,6 @@ check_password       proc
 
                 ret
                 endp
-
-
-
-
-
 
 
 
@@ -167,10 +156,28 @@ give_access     proc
 
         eqaual_pass:
 
+;; -----------------------------canary check----------------------------
+
+                push LEN_OF_CANARY
+                push offset right_canary
+                push offset canary
+
+                call memcmp_asm
+
+;; ---------------------------------------------------------------------
+
+                jne cheater
+
                 mov dx, offset right_input
                 int 21h
-
                 ret
+
+        cheater:
+                mov dx, offset cheater_input
+                int 21h
+                ret
+
+
                 endp
 
 
@@ -181,11 +188,6 @@ give_access     proc
 ;; =====================================================================
 ;; works like standart memcmp
 ;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;;
-;; Expect: /ES/ = /DS/
-;;
-;;        
-;;
 ;;
 ;; Entry: 1 arg  --  offset to 1 array
 ;;
@@ -198,43 +200,52 @@ give_access     proc
 ;; ---------------------------------------------------------------------
 memcmp_asm      proc
 
+                cld   
+
+                push bp
+                mov bp, sp
+
                 push ds
                 pop es
 
 
-                pop si
-                pop di
-                pop cx
+                mov si, [bp + 4]
+                mov di, [bp + 6]
+                mov cx, [bp + 8]
 
 
+                repe cmpsb                      ; cmp ds:[SI++] to es:[DI++] | (SI - DI)
 
-
-                ret
+                pop bp
+                ret 6
                 endp
 
+;; ---------------------------------------------------------------------
+
+
+;; --------------------------phrases to print---------------------------
 
 right_input db "pravilno!!!$"
 wrong_input db "nepravilno$"
+cheater_input db "fuck you:)$"
+
+;; ---------------------------------------------------------------------
 
 
-
-
-
-new_str:
-       db 10
-       db '$'
+right_canary:
+        db "abc"
 
 str_buffer:
 
        db 100                       ; max chars to enter
 buffer db 8 DUP (?)                 ; password buffer
 
-;<------------------------ a place for canary-----------------------------------------------------------------------------------------------------------
+canary:
+
+        db "abc"
 
 is_password_right    db 0
 
-;<------------------------ a place for canary-----------------------------------------------------------------------------------------------------------
-; write check canaries
 
 right_password db "233211"
 

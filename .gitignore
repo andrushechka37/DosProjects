@@ -3,3 +3,7 @@
 *.OBJ
 *.LST
 .DS_Store
+.vscode
+main
+include 21-26-11-024
+Graphics.hpp
