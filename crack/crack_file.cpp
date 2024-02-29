@@ -25,9 +25,13 @@ int main()
 
     fclose(program_file);
 
-    sf::RenderWindow window(sf::VideoMode(200, 200), "SFML works!");
+    sf::RenderWindow window(sf::VideoMode(2000, 2000), "CRAAAAAACK!!!!!!");
     sf::CircleShape shape(100.f);
     shape.setFillColor(sf::Color::Blue);
+
+    sf::Texture texture;
+    texture.loadFromFile("crack.png");
+    sf::Sprite sprite(texture);
 
     while (window.isOpen())
     {
@@ -39,7 +43,7 @@ int main()
         }
 
         window.clear();
-        window.draw(shape);
+        window.draw(sprite);
         window.display();
     }
 
